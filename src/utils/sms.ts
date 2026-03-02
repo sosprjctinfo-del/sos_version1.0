@@ -7,8 +7,11 @@ export const buildWhatsAppLink = (phone: string, message: string): string => {
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 };
 
-export const buildEmergencyMessage = (mapsLink: string): string => {
-  return `🚨 EMERGENCY! I need help urgently!\n\nMy current location:\n${mapsLink}\n\nPlease respond immediately!`;
+export const buildEmergencyMessage = (mapsLink: string, medicalInfo?: string): string => {
+  const trimmedMedicalInfo = medicalInfo?.trim();
+  return `🚨 EMERGENCY! I need help urgently!\n\nMy current location:\n${mapsLink}${
+    trimmedMedicalInfo ? `\n\nMedical Info (ICE):\n${trimmedMedicalInfo}` : ""
+  }\n\nPlease respond immediately!`;
 };
 
 export const playAlertSound = () => {

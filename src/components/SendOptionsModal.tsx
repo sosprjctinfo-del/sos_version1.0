@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Phone, Copy, X, Check } from "lucide-react";
 import { useState } from "react";
-import { Contact } from "@/utils/storage";
+import { Contact, getMedicalProfile } from "@/utils/storage";
 import { buildSMSLink, buildWhatsAppLink, buildEmergencyMessage } from "@/utils/sms";
 
 interface SendOptionsModalProps {
@@ -13,7 +13,18 @@ interface SendOptionsModalProps {
 
 const SendOptionsModal = ({ open, onClose, contacts, mapsLink }: SendOptionsModalProps) => {
   const [copied, setCopied] = useState(false);
-  const message = buildEmergencyMessage(mapsLink);
+  const profile = getMedicalProfile();
+  const medicalInfo = [
+    profile.fullName ? `Name: ${profile.fullName}` : "",
+    profile.bloodGroup ? `Blood: ${profile.bloodGroup}` : "",
+    profile.allergies ? `Allergies: ${profile.allergies}` : "",
+    profile.medications ? `Medications: ${profile.medications}` : "",
+    profile.emergencyNotes ? `Notes: ${profile.emergencyNotes}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const message = buildEmergencyMessage(mapsLink, medicalInfo);
 
   const handleSMS = () => {
     contacts.forEach((c) => {

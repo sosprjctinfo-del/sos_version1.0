@@ -5,12 +5,14 @@ import SOSButton from "@/components/SOSButton";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import SendOptionsModal from "@/components/SendOptionsModal";
 import StatusMessage from "@/components/StatusMessage";
-import { getContacts } from "@/utils/storage";
+import { getContacts, getLastSession, saveLastSession } from "@/utils/storage";
 import { getCurrentLocation, LocationResult } from "@/utils/location";
 import { playAlertSound } from "@/utils/sms";
 
 const Home = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [countdownActive, setCountdownActive] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [sendOpen, setSendOpen] = useState(false);
   const [status, setStatus] = useState<{ type: "info" | "success" | "error" | "loading"; message: string } | null>(null);
   const [location, setLocation] = useState<LocationResult | null>(null);
@@ -18,10 +20,27 @@ const Home = () => {
   const [sessionTime, setSessionTime] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const last = getLastSession();
+    if (!last?.active || !last.startTime) return;
+
+    setSessionActive(true);
+    const elapsed = Math.max(0, Math.floor((Date.now() - last.startTime) / 1000));
+    setSessionTime(elapsed);
+    setStatus({ type: "info", message: "Restored emergency session" });
+    setTimeout(() => setStatus(null), 2500);
+  }, []);
 
   // Session timer
   useEffect(() => {
     if (sessionActive) {
+      const existing = getLastSession();
+      if (!existing?.active || !existing.startTime) {
+        saveLastSession({ active: true, startTime: Date.now() });
+      }
+
       intervalRef.current = setInterval(() => setSessionTime((t) => t + 1), 1000);
       locationIntervalRef.current = setInterval(async () => {
         try {
@@ -36,16 +55,69 @@ const Home = () => {
     };
   }, [sessionActive]);
 
+  useEffect(() => {
+    const shouldBlock = countdownActive || sessionActive;
+    if (!shouldBlock) return;
+
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    const onPopState = () => {
+      const ok = window.confirm("An emergency flow is active. Do you really want to leave this page?");
+      if (!ok) {
+        history.pushState(null, "", window.location.href);
+      }
+    };
+
+    history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [countdownActive, sessionActive]);
+
+  useEffect(() => {
+    if (!countdownActive) return;
+
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, [countdownActive]);
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const handleSOSPress = () => setConfirmOpen(true);
+  const handleSOSPress = () => {
+    if (sessionActive) return;
+    setCountdownActive(true);
+    setCountdown(5);
+    setConfirmOpen(true);
+  };
+
+  const cancelCountdown = () => {
+    setCountdownActive(false);
+    setCountdown(0);
+    setConfirmOpen(false);
+    setStatus({ type: "info", message: "SOS cancelled" });
+    setTimeout(() => setStatus(null), 2000);
+  };
 
   const handleConfirm = useCallback(async () => {
     setConfirmOpen(false);
+    setCountdownActive(false);
+    setCountdown(0);
 
     const contacts = getContacts();
     if (contacts.length === 0) {
@@ -63,15 +135,23 @@ const Home = () => {
       setSendOpen(true);
       setSessionActive(true);
       setSessionTime(0);
+      saveLastSession({ active: true, startTime: Date.now() });
     } catch (err: any) {
       setStatus({ type: "error", message: err.message });
     }
   }, []);
 
+  useEffect(() => {
+    if (!countdownActive) return;
+    if (countdown > 0) return;
+    handleConfirm();
+  }, [countdownActive, countdown, handleConfirm]);
+
   const endSession = () => {
     setSessionActive(false);
     setSessionTime(0);
     setLocation(null);
+    saveLastSession({ active: false, startTime: null });
     setStatus({ type: "info", message: "Emergency session ended" });
     setTimeout(() => setStatus(null), 3000);
   };
@@ -138,10 +218,16 @@ const Home = () => {
       {/* Modals */}
       <ConfirmationModal
         open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={cancelCountdown}
         onConfirm={handleConfirm}
-        title="Send SOS Alert?"
-        message="Are you sure you want to send your emergency location to all contacts?"
+        title={countdownActive ? `Sending SOS in ${countdown}s` : "Send SOS Alert?"}
+        message={
+          countdownActive
+            ? "An emergency alert will be prepared automatically. Tap cancel if this was accidental."
+            : "Are you sure you want to send your emergency location to all contacts?"
+        }
+        confirmText={countdownActive ? "Send Now" : undefined}
+        cancelText={countdownActive ? "Cancel" : undefined}
       />
 
       {location && (
