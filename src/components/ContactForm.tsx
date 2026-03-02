@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { UserPlus, X } from "lucide-react";
+import { UserPlus, X, Phone } from "lucide-react";
 import { Contact } from "@/utils/storage";
+import { pickPhoneContact, isContactsAPISupported, requestContactsPermission } from "@/utils/contacts";
 
 interface ContactFormProps {
   onSave: (contact: Omit<Contact, "id">) => void;
@@ -13,6 +14,7 @@ const ContactForm = ({ onSave, onCancel, initialData }: ContactFormProps) => {
   const [name, setName] = useState(initialData?.name || "");
   const [phone, setPhone] = useState(initialData?.phone || "");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const validate = () => {
     if (!name.trim()) return "Name is required";
@@ -20,6 +22,33 @@ const ContactForm = ({ onSave, onCancel, initialData }: ContactFormProps) => {
     if (!/^[+]?[0-9\s-]{7,15}$/.test(phone.replace(/\s/g, "")))
       return "Invalid phone number format";
     return "";
+  };
+
+  const handlePickContact = async () => {
+    if (!isContactsAPISupported()) {
+      setError("Contact picker not supported on this device");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const hasPermission = await requestContactsPermission();
+      if (!hasPermission) {
+        setError("Contacts permission denied. Please enable in device settings.");
+        return;
+      }
+
+      const contact = await pickPhoneContact();
+      if (contact) {
+        setName(contact.name);
+        setPhone(contact.phone);
+        setError("");
+      }
+    } catch (err) {
+      setError("Failed to pick contact. Please try entering manually.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -52,6 +81,18 @@ const ContactForm = ({ onSave, onCancel, initialData }: ContactFormProps) => {
       </div>
 
       <div className="space-y-3">
+        {isContactsAPISupported() && (
+          <button
+            type="button"
+            onClick={handlePickContact}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent/50 border border-border text-muted-foreground text-sm hover:bg-accent hover:text-foreground transition-all disabled:opacity-50"
+          >
+            <Phone className="w-4 h-4" />
+            {loading ? "Accessing Contacts..." : "Select from Phone Contacts"}
+          </button>
+        )}
+        
         <input
           type="text"
           placeholder="Contact Name"

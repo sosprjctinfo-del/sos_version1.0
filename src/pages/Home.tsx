@@ -157,7 +157,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-10">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 pt-28 pb-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

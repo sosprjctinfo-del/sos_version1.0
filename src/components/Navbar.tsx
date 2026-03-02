@@ -25,7 +25,7 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b border-border/50 ${
+      className={`fixed top-8 left-0 right-0 z-50 transition-all duration-300 border-b border-border/50 ${
         scrolled ? "py-2 glass-card" : "py-3 bg-card/95 backdrop-blur-md"
       }`}
     >

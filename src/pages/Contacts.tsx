@@ -36,7 +36,7 @@ const Contacts = () => {
   const canAdd = contacts.length < MAX_CONTACTS;
 
   return (
-    <div className="min-h-screen pt-24 pb-10 px-4">
+    <div className="min-h-screen pt-32 pb-10 px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
